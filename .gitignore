@@ -43,6 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.kotlin/
+
+# 비밀값이 담긴 환경 파일은 추적하지 않는다.
+.env
+.env.*
 
 # Widget Preview related
 .widget_preview/
