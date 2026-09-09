@@ -66,6 +66,12 @@ class DeviceService {
   Future<void> composeMessage(String number) =>
       _channel.invokeMethod('composeMessage', {'number': number});
 
+  // 본문을 전달하지 않고 선택한 문자와 대화의 식별자로 원문을 연다.
+  Future<void> openMessage(PhoneMessage message) => _channel.invokeMethod(
+    'openMessage',
+    {'id': message.id, 'threadId': message.threadId, 'number': message.number},
+  );
+
   Future<void> insertContact(String number) =>
       _channel.invokeMethod('insertContact', {'number': number});
 

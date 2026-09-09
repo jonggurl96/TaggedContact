@@ -28,8 +28,12 @@ class _HistorySheet extends StatefulWidget {
 
 class _HistorySheetState extends State<_HistorySheet>
     with WidgetsBindingObserver {
+  static const _initialCallCount = 5;
+  static const _callIncrement = 10;
+
   List<PhoneCall> _calls = [];
   List<PhoneMessage> _messages = [];
+  int _visibleCallCount = _initialCallCount;
   bool _loading = true;
   bool _more = false;
   bool _loadingMore = false;
@@ -59,6 +63,8 @@ class _HistorySheetState extends State<_HistorySheet>
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _visibleCallCount = _initialCallCount;
+      _more = false;
       _error = null;
     });
     try {
@@ -95,6 +101,13 @@ class _HistorySheetState extends State<_HistorySheet>
   }
 
   Future<void> _loadMore() async {
+    if (_loading || _loadingMore) return;
+    final nextCount = _visibleCallCount + _callIncrement;
+    // 이미 조회한 기록은 재사용하고 화면에는 열 건씩만 추가한다.
+    if (nextCount <= _calls.length || !_more) {
+      setState(() => _visibleCallCount = nextCount);
+      return;
+    }
     setState(() => _loadingMore = true);
     await runAction(context, () async {
       final next = await widget.controller.device.history(
@@ -106,6 +119,7 @@ class _HistorySheetState extends State<_HistorySheet>
         final ids = _calls.map((call) => call.id).toSet();
         _calls.addAll(next.where((call) => ids.add(call.id)));
         _more = next.length == 100;
+        _visibleCallCount = nextCount;
       });
     });
     if (mounted) setState(() => _loadingMore = false);
@@ -238,30 +252,34 @@ class _HistorySheetState extends State<_HistorySheet>
                   else if (!_loading && _error == null && _calls.isEmpty)
                     const Text('이 번호의 통화기록이 없어요.')
                   else if (!_loading)
-                    ..._calls.map(
-                      (call) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFEAF0E6),
-                          child: Icon(callIcon(call.kind), size: 20),
-                        ),
-                        title: Text(
-                          call.kind.label,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                    ..._calls
+                        .take(_visibleCallCount)
+                        .map(
+                          (call) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFFEAF0E6),
+                              child: Icon(callIcon(call.kind), size: 20),
+                            ),
+                            title: Text(
+                              call.kind.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${dayLabel(call.date)} ${timeLabel(call.date)} · ${durationLabel(call.duration)}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
                           ),
                         ),
-                        subtitle: Text(
-                          '${dayLabel(call.date)} ${timeLabel(call.date)} · ${durationLabel(call.duration)}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  if (_more && !_loading && controller.permissions.calls)
+                  if ((_visibleCallCount < _calls.length || _more) &&
+                      !_loading &&
+                      controller.permissions.calls)
                     TextButton(
                       onPressed: _loadingMore ? null : _loadMore,
-                      child: Text(_loadingMore ? '불러오는 중…' : '이전 통화 더 보기'),
+                      child: Text(_loadingMore ? '불러오는 중…' : '이전 통화 10건 더 보기'),
                     ),
                   if (usable) ...[
                     const SectionHeading('통화 녹음'),
@@ -323,25 +341,35 @@ class _HistorySheetState extends State<_HistorySheet>
                         (message) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: SurfaceCard(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${message.incoming ? '받은 문자' : '보낸 문자'} · ${dayLabel(message.date)} ${timeLabel(message.date)}',
-                                  style: const TextStyle(fontSize: 11),
+                            padding: EdgeInsets.zero,
+                            // 미리보기 전체를 눌러 기본 메시지 앱에서 확인한다.
+                            child: InkWell(
+                              onTap: () => runAction(
+                                context,
+                                () => controller.device.openMessage(message),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${message.incoming ? '받은 문자' : '보낸 문자'} · ${dayLabel(message.date)} ${timeLabel(message.date)}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      message.body,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  message.body,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                         ),

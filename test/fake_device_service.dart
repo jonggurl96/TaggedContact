@@ -13,6 +13,9 @@ class FakeDeviceService extends DeviceService {
   );
   bool failSave = false;
   bool failLoad = false;
+  bool failHistory = false;
+  bool failOpenMessage = false;
+  final historyOffsets = <int>[];
   final actions = <String>[];
   List<PhoneContact> phoneContacts = const [
     PhoneContact(number: '010-1234-5678', name: '김민서'),
@@ -69,16 +72,21 @@ class FakeDeviceService extends DeviceService {
       phoneCalls.skip(offset).take(100).toList();
 
   @override
-  Future<List<PhoneCall>> history(String number, {int offset = 0}) async =>
-      phoneCalls
-          .where((call) => call.key == normalizePhone(number))
-          .skip(offset)
-          .take(100)
-          .toList();
+  Future<List<PhoneCall>> history(String number, {int offset = 0}) async {
+    historyOffsets.add(offset);
+    if (failHistory) throw StateError('통화기록 조회 실패');
+    return phoneCalls
+        .where((call) => call.key == normalizePhone(number))
+        .skip(offset)
+        .take(100)
+        .toList();
+  }
 
   @override
   Future<List<PhoneMessage>> messages(String number) async => [
     PhoneMessage(
+      id: '42',
+      threadId: '7',
       number: number,
       body: '내일 산책 모임에서 만나요!',
       date: DateTime.now(),
@@ -92,6 +100,12 @@ class FakeDeviceService extends DeviceService {
   @override
   Future<void> composeMessage(String number) async =>
       actions.add('sms:$number');
+
+  @override
+  Future<void> openMessage(PhoneMessage message) async {
+    if (failOpenMessage) throw StateError('메시지 앱 실행 실패');
+    actions.add('message:${message.id}:${message.threadId}:${message.number}');
+  }
 
   @override
   Future<void> insertContact(String number) async =>

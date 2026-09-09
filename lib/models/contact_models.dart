@@ -59,18 +59,25 @@ class PhoneCall {
 
 class PhoneMessage {
   const PhoneMessage({
+    required this.id,
+    required this.threadId,
     required this.number,
     required this.body,
     required this.date,
     required this.incoming,
   });
 
+  // 기본 메시지 앱에서 원문과 대화를 찾는 기기 저장소 식별자다.
+  final String id;
+  final String threadId;
   final String number;
   final String body;
   final DateTime date;
   final bool incoming;
 
   factory PhoneMessage.fromMap(Map<Object?, Object?> map) => PhoneMessage(
+    id: map['id'].toString(),
+    threadId: map['threadId'].toString(),
     number: map['number'] as String? ?? '',
     body: map['body'] as String? ?? '',
     date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),

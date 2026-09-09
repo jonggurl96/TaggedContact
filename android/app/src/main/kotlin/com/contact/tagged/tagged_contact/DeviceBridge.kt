@@ -2,6 +2,7 @@ package com.contact.tagged.tagged_contact
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -113,6 +114,7 @@ class DeviceBridge(private val activity: MainActivity) : MethodChannel.MethodCal
                 "messages" -> background(result) { readMessages(phone(call)) }
                 "dial" -> launch(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone(call), null)), result)
                 "composeMessage" -> launch(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", phone(call), null)), result)
+                "openMessage" -> openMessage(call, result)
                 "insertContact" -> launch(Intent(Intent.ACTION_INSERT).apply {
                     type = ContactsContract.RawContacts.CONTENT_TYPE
                     putExtra(ContactsContract.Intents.Insert.PHONE, phone(call))
@@ -230,16 +232,51 @@ class DeviceBridge(private val activity: MainActivity) : MethodChannel.MethodCal
         val selection = numberSelection(Telephony.Sms.ADDRESS, number)
         val rows = mutableListOf<Map<String, Any>>()
         resolver.query(Telephony.Sms.CONTENT_URI,
-            arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE),
+            arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE,
+                Telephony.Sms.TYPE, Telephony.Sms._ID, Telephony.Sms.THREAD_ID),
             "(${selection.first}) AND ${Telephony.Sms.TYPE} IN (1, 2)", selection.second,
             "${Telephony.Sms.DATE} DESC, ${Telephony.Sms._ID} DESC")?.use { cursor ->
             while (cursor.moveToNext() && rows.size < MESSAGE_LIMIT) {
                 rows.add(mapOf("number" to (cursor.getString(0) ?: ""),
                     "body" to (cursor.getString(1) ?: "").take(500),
-                    "date" to cursor.getLong(2), "type" to cursor.getInt(3)))
+                    "date" to cursor.getLong(2), "type" to cursor.getInt(3),
+                    "id" to cursor.getString(4), "threadId" to cursor.getString(5)))
             }
         }
         return rows
+    }
+
+    private fun openMessage(call: MethodCall, result: MethodChannel.Result) {
+        val number = phone(call)
+        val messageId = requireNotNull(call.argument<String>("id")?.toLongOrNull())
+        val threadId = requireNotNull(call.argument<String>("threadId")?.toLongOrNull())
+        require(messageId > 0 && threadId > 0)
+        val smsPackage = Telephony.Sms.getDefaultSmsPackage(activity)
+            ?: throw ActivityNotFoundException()
+
+        // 기본 앱 안에서 원문 URI, 대화 URI, 번호 순으로 지원되는 경로를 연다.
+        // select_id를 지원하는 메시지 앱은 선택한 문자 위치로 이동한다.
+        val intents = listOf(
+            Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, messageId)),
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, threadId),
+                    "vnd.android-dir/mms-sms")
+            },
+            Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null))
+        )
+        for (intent in intents) {
+            intent.setPackage(smsPackage)
+            intent.putExtra("thread_id", threadId)
+            intent.putExtra("select_id", messageId)
+            intent.putExtra("address", number)
+            try {
+                launch(intent, result)
+                return
+            } catch (_: ActivityNotFoundException) {
+                // 현재 앱이 처리하지 않는 URI만 다음 연결 방식으로 재시도한다.
+            }
+        }
+        throw ActivityNotFoundException()
     }
 
     private fun normalizePhone(value: String): String {

@@ -28,6 +28,45 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Finder historyList() => find.descendant(
+    of: find.byType(BottomSheet),
+    matching: find.byType(ListView),
+  );
+
+  // 화면 밖의 항목까지 포함해 상세 목록에 제공된 통화 수를 확인한다.
+  List<ListTile> historyRows(WidgetTester tester) {
+    final list = tester.widget<ListView>(historyList());
+    return (list.childrenDelegate as SliverChildListDelegate).children
+        .whereType<ListTile>()
+        .toList();
+  }
+
+  Future<void> tapInHistory(WidgetTester tester, Finder target) async {
+    await tester.scrollUntilVisible(
+      target,
+      300,
+      scrollable: find.descendant(
+        of: historyList(),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  void setHistory(int count) {
+    device.phoneCalls = List.generate(
+      count,
+      (index) => PhoneCall(
+        id: '$index',
+        number: '01012345678',
+        date: DateTime(2026, 9, 9).subtract(Duration(minutes: index)),
+        kind: CallKind.incoming,
+        duration: index + 1,
+      ),
+    );
+  }
+
   testWidgets('통화기록이 메인이며 세 화면을 이동한다', (tester) async {
     await prepare();
     await openApp(tester);
@@ -117,6 +156,88 @@ void main() {
     await tester.tap(find.byTooltip('문자보내기').first);
     await tester.pumpAndSettle();
     expect(device.actions, contains('sms:01012345678'));
+  });
+
+  testWidgets('통화 상세는 5건으로 시작하고 10건씩 늘며 마지막에는 더보기를 숨긴다', (tester) async {
+    await prepare();
+    setHistory(16);
+    await openApp(tester);
+    await tester.tap(find.text('김민서').first);
+    await tester.pumpAndSettle();
+    expect(historyRows(tester), hasLength(5));
+
+    final more = find.text('이전 통화 10건 더 보기');
+    await tapInHistory(tester, more);
+    expect(historyRows(tester), hasLength(15));
+    await tapInHistory(tester, more);
+    expect(historyRows(tester), hasLength(16));
+    expect(more, findsNothing);
+    expect(device.historyOffsets, [0]);
+
+    await tester.tap(find.byTooltip('기록 새로고침'));
+    await tester.pumpAndSettle();
+    expect(historyRows(tester), hasLength(5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('조회한 100건을 넘길 때만 추가 조회하고 실패 후 재시도할 수 있다', (tester) async {
+    await prepare();
+    setHistory(103);
+    await openApp(tester);
+    await tester.tap(find.text('김민서').first);
+    await tester.pumpAndSettle();
+    final more = find.text('이전 통화 10건 더 보기');
+    for (var count = 15; count <= 95; count += 10) {
+      await tapInHistory(tester, more);
+      expect(historyRows(tester), hasLength(count));
+    }
+    expect(device.historyOffsets, [0]);
+
+    device.failHistory = true;
+    await tapInHistory(tester, more);
+    expect(historyRows(tester), hasLength(95));
+    expect(find.byType(SnackBar), findsOneWidget);
+    device.failHistory = false;
+    await tapInHistory(tester, more);
+    expect(historyRows(tester), hasLength(103));
+    final subtitles = historyRows(tester)
+        .map((row) => (row.subtitle! as Text).data);
+    expect(subtitles.toSet(), hasLength(103));
+    expect(device.historyOffsets, [0, 100, 100]);
+    expect(more, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final count in [0, 3, 5]) {
+    testWidgets('통화 상세가 $count건이면 더보기를 표시하지 않는다', (tester) async {
+      await prepare();
+      setHistory(count);
+      await openApp(tester);
+      await tester.tap(find.text('김민서').first);
+      await tester.pumpAndSettle();
+      expect(historyRows(tester), hasLength(count));
+      expect(find.text('이전 통화 10건 더 보기'), findsNothing);
+      if (count == 0) {
+        expect(find.text('이 번호의 통화기록이 없어요.'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('문자 미리보기를 누르면 선택한 원문을 열고 실행 실패를 안내한다', (tester) async {
+    await prepare();
+    await openApp(tester);
+    await tester.tap(find.text('김민서').first);
+    await tester.pumpAndSettle();
+    final message = find.text('내일 산책 모임에서 만나요!');
+    await tapInHistory(tester, message);
+    expect(device.actions, ['message:42:7:01012345678']);
+
+    device.failOpenMessage = true;
+    await tapInHistory(tester, message);
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(device.actions, hasLength(1));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('작은 화면과 큰 글자에서 화면과 입력창이 넘치지 않는다', (tester) async {
