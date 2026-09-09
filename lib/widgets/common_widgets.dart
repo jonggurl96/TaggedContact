@@ -148,33 +148,36 @@ class EmptyState extends StatelessWidget {
   final String title;
   final String description;
 
+  // 부모 목록의 정렬과 관계없이 빈 목록 안내를 가로 중앙에 배치한다.
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-    child: Column(
-      children: [
-        CircleAvatar(
-          radius: 34,
-          backgroundColor: const Color(0xFFE5EBDF),
-          child: Icon(
-            icon,
-            size: 30,
-            color: Theme.of(context).colorScheme.primary,
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 34,
+            backgroundColor: const Color(0xFFE5EBDF),
+            child: Icon(
+              icon,
+              size: 30,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          description,
-          textAlign: TextAlign.center,
-          style: const TextStyle(height: 1.6),
-        ),
-      ],
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            textAlign: TextAlign.center,
+            style: const TextStyle(height: 1.6),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -216,7 +219,9 @@ class _PermissionCardState extends State<PermissionCard> {
         Icons.call_outlined,
       ),
     };
-    return Padding(
+    // 권한 안내 카드가 부모 영역의 전체 너비를 채우도록 한다.
+    return Container(
+      width: double.infinity,
       padding: const EdgeInsets.only(top: 12),
       child: SurfaceCard(
         child: Column(
