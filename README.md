@@ -86,3 +86,11 @@ flutter test integration_test/device_test.dart -d emulator-5580
 통합 테스트는 기존 앱 JSON을 마지막에 복원합니다. 화면 확인용 PNG는 테스트 앱의 캐시에 `tagged_home.png`, `tagged_contacts.png`, `tagged_settings.png`로 남깁니다.
 
 Android 37 에뮬레이터는 외부에서 삽입한 합성 SMS를 보호 대상으로 분류합니다. 이 경우 `--dart-define=SMS_FIXTURE_RESTRICTED=true`를 통합 테스트 명령에 추가하여 해당 메시지가 앱에 노출되지 않는지 검증합니다. 일반 문자 미리보기의 화면 동작은 위젯 테스트로 별도 검증합니다.
+
+## APK 빌드하기
+
+```powershell
+flutter clean
+flutter pub get
+flutter build apk --release
+```
