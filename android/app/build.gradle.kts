@@ -36,6 +36,17 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // pubspec.yaml의 versionName([version]+[build], 예: 1.0.0+1)을 읽어와 릴리스 APK 파일명을 변경한다.
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            if (variant.buildType.name == "release") {
+                output?.outputFileName = "app-${variant.versionName}.apk"
+            }
+        }
+    }
 }
 
 kotlin {
