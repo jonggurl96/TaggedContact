@@ -13,10 +13,12 @@ class ContactTile extends StatelessWidget {
     required this.controller,
     required this.number,
     this.call,
+    this.callCount = 1,
   });
   final ContactController controller;
   final String number;
   final PhoneCall? call;
+  final int callCount;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +75,9 @@ class ContactTile extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title,
+                            call != null && callCount > 1
+                                ? '$title ($callCount)'
+                                : title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

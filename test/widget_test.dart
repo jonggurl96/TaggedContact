@@ -81,6 +81,124 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('연속된 번호는 횟수와 최신 통화만 표시하고 상세에서는 개별 기록을 보여준다', (tester) async {
+    await prepare();
+    device.phoneCalls = [
+      PhoneCall(
+        id: '1',
+        number: '01012345678',
+        date: DateTime(2026, 9, 21, 0, 1),
+        kind: CallKind.outgoing,
+        duration: 60,
+      ),
+      PhoneCall(
+        id: '2',
+        number: '+82 10-1234-5678',
+        date: DateTime(2026, 9, 20, 23, 59),
+        kind: CallKind.incoming,
+        duration: 120,
+      ),
+      PhoneCall(
+        id: '3',
+        number: '010-1234-5678',
+        date: DateTime(2026, 9, 20, 23, 58),
+        kind: CallKind.missed,
+      ),
+      PhoneCall(
+        id: '4',
+        number: '01022223333',
+        date: DateTime(2026, 9, 20, 23, 57),
+        kind: CallKind.outgoing,
+      ),
+      PhoneCall(
+        id: '5',
+        number: '01012345678',
+        date: DateTime(2026, 9, 20, 23, 56),
+        kind: CallKind.missed,
+      ),
+    ];
+    await controller.refresh();
+    await openApp(tester);
+    tester.view.physicalSize = const Size(430, 1400);
+    await tester.pumpAndSettle();
+    expect(find.text('김민서 (3)'), findsOneWidget);
+    expect(find.text('박지훈'), findsOneWidget);
+    expect(find.text('김민서'), findsOneWidget);
+    expect(find.text('발신 · 00:01'), findsOneWidget);
+    expect(find.text('· 1분 0초'), findsOneWidget);
+    expect(find.text('수신 · 23:59'), findsNothing);
+    expect(find.text('· 2분 0초'), findsNothing);
+
+    await tester.tap(find.text('김민서 (3)'));
+    await tester.pumpAndSettle();
+    expect(historyRows(tester), hasLength(4));
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
+
+    // 부재중 필터에서는 표시 대상인 부재중 통화만 집계한다.
+    await tester.tap(find.widgetWithText(ChoiceChip, '부재중'));
+    await tester.pumpAndSettle();
+    expect(find.text('김민서 (2)'), findsOneWidget);
+    expect(find.text('부재중 · 23:58'), findsOneWidget);
+    expect(find.text('발신 · 00:01'), findsNothing);
+    expect(find.text('박지훈'), findsNothing);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '전체'));
+    await tester.enterText(find.byType(TextField), '김민서');
+    await tester.pumpAndSettle();
+    expect(find.text('김민서 (4)'), findsOneWidget);
+    expect(find.text('발신 · 00:01'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('다음 페이지의 연속된 통화는 기존 항목의 횟수에 더한다', (tester) async {
+    await prepare();
+    setHistory(103);
+    await controller.refresh();
+    await openApp(tester);
+    expect(find.text('김민서 (100)'), findsOneWidget);
+    final more = find.text('이전 통화 100건 더 보기');
+    await tester.ensureVisible(more);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(find.text('김민서 (103)'), findsOneWidget);
+    expect(find.text('김민서 (100)'), findsNothing);
+    expect(find.text('수신 · 00:00'), findsOneWidget);
+    expect(more, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('이름이 같아도 번호가 다르거나 표시제한이면 각각 표시한다', (tester) async {
+    await prepare();
+    device.phoneContacts = const [
+      PhoneContact(number: '01012345678', name: '동명이인'),
+      PhoneContact(number: '01022223333', name: '동명이인'),
+    ];
+    device.phoneCalls = [
+      for (final (index, number) in [
+        '01012345678',
+        '01022223333',
+        '',
+        '',
+      ].indexed)
+        PhoneCall(
+          id: '$index',
+          number: number,
+          date: DateTime(2026, 9, 21, 12).subtract(Duration(minutes: index)),
+          kind: CallKind.incoming,
+        ),
+    ];
+    await controller.refresh();
+    await openApp(tester);
+    tester.view.physicalSize = const Size(430, 1600);
+    await tester.pumpAndSettle();
+    expect(find.text('동명이인'), findsNWidgets(2));
+    expect(find.text('발신번호 표시제한'), findsNWidgets(2));
+    expect(find.text('동명이인 (2)'), findsNothing);
+    expect(find.text('발신번호 표시제한 (2)'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('번호를 직접 입력하고 마지막 빈칸의 태그까지 저장한다', (tester) async {
     await prepare();
     await openApp(tester);

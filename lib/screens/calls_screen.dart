@@ -21,14 +21,28 @@ class _CallsScreenState extends State<CallsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final calls = controller.calls
-        .where(
-          (call) =>
-              controller.matches(call.number, _query) &&
-              (_filter != 1 || call.kind == CallKind.missed) &&
-              (_filter != 2 || controller.tagsFor(call.number).isNotEmpty),
-        )
-        .toList();
+    final calls = controller.calls.where(
+      (call) =>
+          controller.matches(call.number, _query) &&
+          (_filter != 1 || call.kind == CallKind.missed) &&
+          (_filter != 2 || controller.tagsFor(call.number).isNotEmpty),
+    );
+    final callGroups = <({PhoneCall latest, int count})>[];
+    // 최신순 결과를 한 번 순회해 연속된 번호만 묶고 첫 통화를 대표로 유지한다.
+    for (final call in calls) {
+      if (callGroups.isNotEmpty &&
+          isUsablePhone(call.number) &&
+          callGroups.last.latest.key == call.key) {
+        final previous = callGroups.last;
+        callGroups[callGroups.length - 1] = (
+          latest: previous.latest,
+          count: previous.count + 1,
+        );
+      } else {
+        // 표시제한 번호는 같은 연락처인지 확인할 수 없어 각각 표시한다.
+        callGroups.add((latest: call, count: 1));
+      }
+    }
     return RefreshIndicator(
       onRefresh: controller.refresh,
       child: CustomScrollView(
@@ -133,7 +147,7 @@ class _CallsScreenState extends State<CallsScreen> {
                     PermissionCard(controller: controller, kind: 'calls'),
                   if (!controller.permissions.contacts)
                     PermissionCard(controller: controller, kind: 'contacts'),
-                  if (controller.permissions.calls && calls.isEmpty)
+                  if (controller.permissions.calls && callGroups.isEmpty)
                     EmptyState(
                       icon: Icons.history_rounded,
                       title: _query.isNotEmpty || _filter != 0
@@ -150,12 +164,14 @@ class _CallsScreenState extends State<CallsScreen> {
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverList.builder(
-              itemCount: calls.length,
+              itemCount: callGroups.length,
               itemBuilder: (context, index) {
-                final call = calls[index];
+                final group = callGroups[index];
+                final call = group.latest;
                 final label = dayLabel(call.date);
                 final newDay =
-                    index == 0 || dayLabel(calls[index - 1].date) != label;
+                    index == 0 ||
+                    dayLabel(callGroups[index - 1].latest.date) != label;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -164,6 +180,7 @@ class _CallsScreenState extends State<CallsScreen> {
                       controller: controller,
                       number: call.number,
                       call: call,
+                      callCount: group.count,
                     ),
                   ],
                 );
