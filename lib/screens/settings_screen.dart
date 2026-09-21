@@ -13,8 +13,42 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  late final TextEditingController _callHeadline;
   double? _fontScale;
   bool _picking = false;
+  bool _savingCallHeadline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _callHeadline = TextEditingController(
+      text: widget.controller.settings.callHeadline,
+    );
+  }
+
+  @override
+  void dispose() {
+    _callHeadline.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveCallHeadline() async {
+    FocusScope.of(context).unfocus();
+    final input = _callHeadline.text.trim();
+    final headline = input.isEmpty ? AppSettings.defaultCallHeadline : input;
+    setState(() => _savingCallHeadline = true);
+    // 저장에 성공한 경우에만 문구를 반영하고, 실패하면 입력 내용을 유지한다.
+    final saved = await runAction(
+      context,
+      () => widget.controller.updateSettings(
+        (settings) => settings.copyWith(callHeadline: headline),
+      ),
+      success: '통화기록 문구를 저장했어요.',
+    );
+    if (!mounted) return;
+    if (saved) _callHeadline.text = headline;
+    setState(() => _savingCallHeadline = false);
+  }
 
   Future<void> _background(AppScreen screen) async {
     setState(() => _picking = true);
@@ -58,6 +92,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 8),
         const Text('작은 취향까지, 내 방식대로 설정하세요.', style: TextStyle(fontSize: 12)),
+        const SectionHeading('통화기록 문구'),
+        SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _callHeadline,
+                enabled: controller.storageReady && !_savingCallHeadline,
+                minLines: 2,
+                maxLines: 4,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(labelText: '상단 문구'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '줄바꿈을 넣을 수 있어요. 비워서 저장하면 기본 문구로 돌아가요.',
+                style: TextStyle(fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: controller.storageReady && !_savingCallHeadline
+                      ? _saveCallHeadline
+                      : null,
+                  child: Text(_savingCallHeadline ? '저장 중…' : '문구 저장'),
+                ),
+              ),
+            ],
+          ),
+        ),
         const SectionHeading('글자와 색상'),
         SurfaceCard(
           child: Column(

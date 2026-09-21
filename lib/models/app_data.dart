@@ -10,7 +10,11 @@ enum AppScreen {
 }
 
 class AppSettings {
+  // 문구 설정이 없는 기존 데이터에도 같은 기본 문구를 표시한다.
+  static const defaultCallHeadline = '번호 너머,\n기억하고 싶은 관계.';
+
   const AppSettings({
+    this.callHeadline = defaultCallHeadline,
     this.fontScale = 1,
     this.textColor = 0xFF243B35,
     this.backgroundColor = 0xFFF5F6F0,
@@ -18,6 +22,7 @@ class AppSettings {
     this.backgrounds = const {},
   });
 
+  final String callHeadline;
   final double fontScale;
   final int textColor;
   final int backgroundColor;
@@ -25,12 +30,14 @@ class AppSettings {
   final Map<String, String> backgrounds;
 
   AppSettings copyWith({
+    String? callHeadline,
     double? fontScale,
     int? textColor,
     int? backgroundColor,
     bool? suggestionsEnabled,
     Map<String, String>? backgrounds,
   }) => AppSettings(
+    callHeadline: callHeadline ?? this.callHeadline,
     fontScale: fontScale ?? this.fontScale,
     textColor: textColor ?? this.textColor,
     backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -39,6 +46,7 @@ class AppSettings {
   );
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
+    callHeadline: json['callHeadline'] as String? ?? defaultCallHeadline,
     fontScale: (json['fontScale'] as num? ?? 1).toDouble().clamp(0.85, 1.4),
     textColor: json['textColor'] as int? ?? 0xFF243B35,
     backgroundColor: json['backgroundColor'] as int? ?? 0xFFF5F6F0,
@@ -47,6 +55,7 @@ class AppSettings {
   );
 
   Map<String, dynamic> toJson() => {
+    'callHeadline': callHeadline,
     'fontScale': fontScale,
     'textColor': textColor,
     'backgroundColor': backgroundColor,

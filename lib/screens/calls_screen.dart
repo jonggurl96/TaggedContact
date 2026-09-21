@@ -50,9 +50,9 @@ class _CallsScreenState extends State<CallsScreen> {
                     ),
                   ),
                   const SizedBox(height: 9),
-                  const Text(
-                    '번호 너머,\n기억하고 싶은 관계.',
-                    style: TextStyle(
+                  Text(
+                    controller.settings.callHeadline,
+                    style: const TextStyle(
                       fontSize: 29,
                       fontWeight: FontWeight.w800,
                       height: 1.3,
